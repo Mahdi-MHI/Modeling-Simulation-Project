@@ -52,7 +52,7 @@ Deffz = 53*(1/3600);             % [m^2/h][m^2/s]                   Effective ma
 kg = 576*(1/3600);               % [m^3/(m^2*h)][m^3/(m^2*s)]       Surface mass transfer coefficient.
 hg = 928.8*(1000)*(1/3600);      % [kJ/(m^2*h*K)][J/(m^2*s*K)]      Surface heat transfer coefficient.
 
-keffz = 9.72*(1000)*(1/3600);    % [kJ/(m*h*K)][J/(m*s*K)]          Effective thermal conductivity.
+keffz = 0.5*9.72*(1000)*(1/3600);    % [kJ/(m*h*K)][J/(m*s*K)]          Effective thermal conductivity.
                                  %                                  in the radius direction.
 keffr = 9.72*(1000)*(1/3600);    % [kJ/(m*h*K)][J/(m*s*K)]          Effective thermal conductivity.
                                  %                                  in the radius direction.
@@ -79,7 +79,7 @@ CO   = struct('Mw',28.01,   'Tc',134.18,    'Pc',3710046,...
     'cp_R',[3.376,0.000557,0,-3100,2500]        ,'deltaS0',-8.66e01 ,'deltaH0',(1000)*-4.09e01);
 H2O  = struct('Mw',18.015,  'Tc',647.1081,  'Pc',22072227,...
     'cp_R',[3.47,0.00145,0,12100,2000]          ,'deltaS0',-5.27e01 ,'deltaH0',(1000)*-8.63e01);
-N2   = struct('Mw',28.014,  'Tc',126.2069,  'Pc',3398154.1,...
+N2   = struct('Mw',28.014,  'Tc',126.2069,  'Pc',3398154 ,...
     'cp_R',[3.28,0.000593,0,4000,2000]          ,'deltaS0',[0]      ,'deltaH0',[0]);
 
 Components = [C2H6 C2H4 O2 CO2 CO H2O N2];       % List of components
@@ -103,8 +103,8 @@ RxnKinetic = struct('Aprime',[4.95 1.35 1.76 2.61 2.16]*(1/1000)*(1/3600),...
 
 %===Interior points and coefficients matrix -------------------------------
 
-Nz = 5; % No. of interior point in z direction.
-Nr = 3; % No. of interior point in r direction.
+Nz = 10; % No. of interior point in z direction.
+Nr = 5; % No. of interior point in r direction.
 zmin = 0; zmax = 1;
 rmin = 0; rmax = 1;
 z_nodes = [0,sort(Roots_of_Jacobi_Polynomial(0,0,Nz))',1] ;  % Roots of Jacobi polynomial with (a,b==0) in z direction.
@@ -152,6 +152,7 @@ for i = 1:numel(r_nodes)
     end
 end
 
+% load Orthogonal_Matrix.mat
 %===Initial guess ---------------------------------------------------------
 
 Nz = length(z_nodes)-2;  % Declare the number of Interior nodes for BC
@@ -165,14 +166,14 @@ Initial_Guess_C_CO2         =  ones(Nz,Nr)*((Pt*y_CO2_in)/(R*T0)) ;
 Initial_Guess_C_CO          =  ones(Nz,Nr)*((Pt*y_CO_in)/(R*T0))  ;
 Initial_Guess_C_H2O         =  ones(Nz,Nr)*((Pt*y_H2O_in)/(R*T0)) ;
 Initial_Guess_C_N2          =  ones(Nz,Nr)*((Pt*y_N2_in)/(R*T0))  ;
-Initial_Guess_Rof           =  ones(Nz,Nr)*397.5;                   % [g/m^3] Aspen Hysys at inlet condition
+Initial_Guess_Rof           =  ones(Nz,Nr)*615;                   
 Initial_Guess_Cs_C2H6       =  zeros(Nz,Nr);
 Initial_Guess_Cs_C2H4       =  zeros(Nz,Nr);
 Initial_Guess_Cs_O2         =  zeros(Nz,Nr);
 Initial_Guess_Cs_CO2        =  zeros(Nz,Nr);
 Initial_Guess_Cs_CO         =  zeros(Nz,Nr);
 Initial_Guess_Cs_H2O        =  zeros(Nz,Nr);
-Initial_Guess_Cpf           =  ones(Nz,Nr)*33.3/29;                    % [J/(mol.K)] Aspen Hysys at inlet condition
+Initial_Guess_Cpf           =  ones(Nz,Nr)*33.3/29;                 % [J/(mol.K)] Aspen Hysys at inlet condition
 Initial_Guess_T             =  ones(Nz,Nr)*T0;
 Initial_Guess_Ts            =  ones(Nz,Nr)*T0;
 
@@ -188,10 +189,9 @@ Initial_Guess=[reshape(Initial_Guess_C_C2H6,1,Nz*Nr)  ,  reshape(Initial_Guess_C
 
 %===Solver ----------------------------------------------------------------
 
-% option = optimoptions('fsolve','Algorithm','trust-region','StepTolerance',1e-12,...
-%     'MaxFunctionEvaluations',500);
+Option = optimoptions('fsolve','Algorithm','levenberg-marquardt','Display','iter','OptimalityTolerance',1e-20);
 X=fsolve(@(x) Equations(x,Az,Bz,Ar,Br,Nz,Nr,u0,C0,Pt,T0,hw,Tb,epsilon,Density_bed,...
-    Flowin,Deffz,Deffr,keffz,keffr,R_nodes,kg,hg,as,Components,RxnKinetic,R),Initial_Guess);
+    Flowin,Deffz,Deffr,keffz,keffr,R_nodes,kg,hg,as,Components,RxnKinetic,R),Initial_Guess,Option);
 
 C_C2H6_hat   = sym(zeros(1)) ;       C_C2H4_hat  = sym(zeros(1))  ;
 C_O2_hat     = sym(zeros(1)) ;       C_CO2_hat   = sym(zeros(1))  ;
@@ -258,7 +258,7 @@ C_Cpf(1,k)     = X(7);
 
 C_Rof(1,k)     = (Pt*((C_C_C2H6(1,k)/(C_C_C2H6(1,k)+C_C_C2H4(1,k)+C_C_O2(1,k)+C_C_CO2(1,k)+C_C_CO(1,k)+C_C_H2O(1,k)+C_C_N2(1,k)))*Components(1).Mw + (C_C_C2H4(1,k)/(C_C_C2H6(1,k)+C_C_C2H4(1,k)+C_C_O2(1,k)+C_C_CO2(1,k)+C_C_CO(1,k)+C_C_H2O(1,k)+C_C_N2(1,k)))*Components(2).Mw + (C_C_O2(1,k)/(C_C_C2H6(1,k)+C_C_C2H4(1,k)+C_C_O2(1,k)+C_C_CO2(1,k)+C_C_CO(1,k)+C_C_H2O(1,k)+C_C_N2(1,k)))*Components(3).Mw + (C_C_CO2(1,k)/(C_C_C2H6(1,k)+C_C_C2H4(1,k)+C_C_O2(1,k)+C_C_CO2(1,k)+C_C_CO(1,k)+C_C_H2O(1,k)+C_C_N2(1,k)))*Components(4).Mw + (C_C_CO(1,k)/(C_C_C2H6(1,k)+C_C_C2H4(1,k)+C_C_O2(1,k)+C_C_CO2(1,k)+C_C_CO(1,k)+C_C_H2O(1,k)+C_C_N2(1,k)))*Components(5).Mw ...
                + (C_C_H2O(1,k)/(C_C_C2H6(1,k)+C_C_C2H4(1,k)+C_C_O2(1,k)+C_C_CO2(1,k)+C_C_CO(1,k)+C_C_H2O(1,k)+C_C_N2(1,k)))*Components(6).Mw + (C_C_N2(1,k)/(C_C_C2H6(1,k)+C_C_C2H4(1,k)+C_C_O2(1,k)+C_C_CO2(1,k)+C_C_CO(1,k)+C_C_H2O(1,k)+C_C_N2(1,k)))*Components(7).Mw))/(R*T(1,k)); % [g/m^3] Density of fluid;
-C_T(1,k)       = (u0*C_Rof(1,k)*C_Cpf(1,k)*T0 + kez*Az(1,2:end-1)*T(2:end-1,k) + kez*Az(1,end)/Az(end,end)*(-Az(end,2:end-1)*T(2:end-1,k)) )/((1 + kez*Az(end,1)*Az(1,end)/Az(end,end))*(u0*C_Rof(1,k)*Cpf(1,k) - kez*Az(1,1)));
+C_T(1,k)       = (u0*C_Rof(1,k)*C_Cpf(1,k)*T0 + keffz*Az(1,2:end-1)*C_T(2:end-1,k) + keffz*Az(1,end)/Az(end,end)*(-Az(end,2:end-1)*C_T(2:end-1,k)) )/((1 + keffz*Az(end,1)*Az(1,end)/Az(end,end))*(u0*C_Rof(1,k)*C_Cpf(1,k) - keffz*Az(1,1)));
 C_Ts(1,k)      = X(8);
 
 %z=L
@@ -283,7 +283,7 @@ C_Cs_H2O(end,k)  = X(6);
 C_Cpf(end,k)     = X(7);   
 C_Rof(end,k)     = (Pt*((C_C_C2H6(end,k)/(C_C_C2H6(end,k)+C_C_C2H4(end,k)+C_C_O2(end,k)+C_C_CO2(end,k)+C_C_CO(end,k)+C_C_H2O(end,k)+C_C_N2(end,k)))*Components(1).Mw + (C_C_C2H4(end,k)/(C_C_C2H6(end,k)+C_C_C2H4(end,k)+C_C_O2(end,k)+C_C_CO2(end,k)+C_C_CO(end,k)+C_C_H2O(end,k)+C_C_N2(end,k)))*Components(2).Mw + (C_C_O2(end,k)/(C_C_C2H6(end,k)+C_C_C2H4(end,k)+C_C_O2(end,k)+C_C_CO2(end,k)+C_C_CO(end,k)+C_C_H2O(end,k)+C_C_N2(end,k)))*Components(3).Mw + (C_C_CO2(end,k)/(C_C_C2H6(end,k)+C_C_C2H4(end,k)+C_C_O2(end,k)+C_C_CO2(end,k)+C_C_CO(end,k)+C_C_H2O(end,k)+C_C_N2(end,k)))*Components(4).Mw + (C_C_CO(end,k)/(C_C_C2H6(end,k)+C_C_C2H4(end,k)+C_C_O2(end,k)+C_C_CO2(end,k)+C_C_CO(end,k)+C_C_H2O(end,k)+C_C_N2(end,k)))*Components(5).Mw ...
                  + (C_C_H2O(end,k)/(C_C_C2H6(end,k)+C_C_C2H4(end,k)+C_C_O2(end,k)+C_C_CO2(end,k)+C_C_CO(end,k)+C_C_H2O(end,k)+C_C_N2(end,k)))*Components(6).Mw + (C_C_N2(end,k)/(C_C_C2H6(end,k)+C_C_C2H4(end,k)+C_C_O2(end,k)+C_C_CO2(end,k)+C_C_CO(end,k)+C_C_H2O(end,k)+C_C_N2(end,k)))*Components(7).Mw))/(R*T(end,k)); % [g/m^3] Density of fluid;
-C_T(end,k)       = (-Az(end,2:end-1)*T(2:end-1,k) - Az(end,1)*(u0*C_Rof(1,k)*C_Cpf(1,k)*T0 + kez*Az(1,2:end-1)*T(2:end-1,k) + kez*Az(1,end)/Az(end,end)*(-Az(end,2:end-1)*T(2:end-1,k)) )/((1 + kez*Az(end,1)*Az(1,end)/Az(end,end))*(u0*C_Rof(1,k)*Cpf(1,k) - kez*Az(1,1))) )/Az(end,end);
+C_T(end,k)       = (-Az(end,2:end-1)*C_T(2:end-1,k) - Az(end,1)*(u0*C_Rof(end,k)*C_Cpf(end,k)*T0 + keffz*Az(1,2:end-1)*C_T(2:end-1,k) + keffz*Az(1,end)/Az(end,end)*(-Az(end,2:end-1)*C_T(2:end-1,k)) )/((1 + keffz*Az(end,1)*Az(1,end)/Az(end,end))*(u0*C_Rof(1,k)*C_Cpf(1,k) - keffz*Az(1,1))) )/Az(end,end);
 C_Ts(end,k)      = X(8);
 
 end
@@ -311,7 +311,7 @@ C_Cs_H2O(i,1)  = X(6);
 C_Cpf(i,1)     = X(7);   
 C_Rof(i,1)     = (Pt*((C_C_C2H6(i,1)/(C_C_C2H6(i,1)+C_C_C2H4(i,1)+C_C_O2(i,1)+C_C_CO2(i,1)+C_C_CO(i,1)+C_C_H2O(i,1)+C_C_N2(i,1)))*Components(1).Mw + (C_C_C2H4(i,1)/(C_C_C2H6(i,1)+C_C_C2H4(i,1)+C_C_O2(i,1)+C_C_CO2(i,1)+C_C_CO(i,1)+C_C_H2O(i,1)+C_C_N2(i,1)))*Components(2).Mw + (C_C_O2(i,1)/(C_C_C2H6(i,1)+C_C_C2H4(i,1)+C_C_O2(i,1)+C_C_CO2(i,1)+C_C_CO(i,1)+C_C_H2O(i,1)+C_C_N2(i,1)))*Components(3).Mw + (C_C_CO2(i,1)/(C_C_C2H6(i,1)+C_C_C2H4(i,1)+C_C_O2(i,1)+C_C_CO2(i,1)+C_C_CO(i,1)+C_C_H2O(i,1)+C_C_N2(i,1)))*Components(4).Mw + (C_C_CO(i,1)/(C_C_C2H6(i,1)+C_C_C2H4(i,1)+C_C_O2(i,1)+C_C_CO2(i,1)+C_C_CO(i,1)+C_C_H2O(i,1)+C_C_N2(i,1)))*Components(5).Mw ...
                  + (C_C_H2O(i,1)/(C_C_C2H6(i,1)+C_C_C2H4(i,1)+C_C_O2(i,1)+C_C_CO2(i,1)+C_C_CO(i,1)+C_C_H2O(i,1)+C_C_N2(i,1)))*Components(6).Mw + (C_C_N2(i,1)/(C_C_C2H6(i,1)+C_C_C2H4(i,1)+C_C_O2(i,1)+C_C_CO2(i,1)+C_C_CO(i,1)+C_C_H2O(i,1)+C_C_N2(i,1)))*Components(7).Mw))/(R*T(i,1)); % [g/m^3] Density of fluid;
-C_T(i,1)       = (-Ar(1,2:end-1)*T(i,2:end-1) - ker*Ar(1,end)*(Ar(end,2:end-1)*T(i,2:end-1) + hw*Tb)/(hw - ker*Ar(end,end)))/((1 + (ker*Ar(1,end)*Ar(end,1))/(hw - ker*Ar(end,end)))*Ar(1,1));
+C_T(i,1)       = (-Ar(1,2:end-1)*C_T(i,2:end-1) - Ar(1,end)*(keffr*Ar(end,2:end-1)*C_T(i,2:end-1) + hw*Tb)/(hw - keffr*Ar(end,end)))/((1 + (keffr*Ar(1,end)*Ar(end,1))/((hw - keffr*Ar(end,end))*Ar(1,1) ) )*Ar(1,1));
 C_Ts(i,1)      = X(8);
            
 %r=R
@@ -336,7 +336,7 @@ C_Cs_H2O(i,end)  = X(6);
 C_Cpf(i,end)     = X(7);   
 C_Rof(i,end)     = (Pt*((C_C_C2H6(i,end)/(C_C_C2H6(i,end)+C_C_C2H4(i,end)+C_C_O2(i,end)+C_C_CO2(i,end)+C_C_CO(i,end)+C_C_H2O(i,end)+C_C_N2(i,end)))*Components(1).Mw + (C_C_C2H4(i,end)/(C_C_C2H6(i,end)+C_C_C2H4(i,end)+C_C_O2(i,end)+C_C_CO2(i,end)+C_C_CO(i,end)+C_C_H2O(i,end)+C_C_N2(i,end)))*Components(2).Mw + (C_C_O2(i,end)/(C_C_C2H6(i,end)+C_C_C2H4(i,end)+C_C_O2(i,end)+C_C_CO2(i,end)+C_C_CO(i,end)+C_C_H2O(i,end)+C_C_N2(i,end)))*Components(3).Mw + (C_C_CO2(i,end)/(C_C_C2H6(i,end)+C_C_C2H4(i,end)+C_C_O2(i,end)+C_C_CO2(i,end)+C_C_CO(i,end)+C_C_H2O(i,end)+C_C_N2(i,end)))*Components(4).Mw + (C_C_CO(i,end)/(C_C_C2H6(i,end)+C_C_C2H4(i,end)+C_C_O2(i,end)+C_C_CO2(i,end)+C_C_CO(i,end)+C_C_H2O(i,end)+C_C_N2(i,end)))*Components(5).Mw ...
                    + (C_C_H2O(i,end)/(C_C_C2H6(i,end)+C_C_C2H4(i,end)+C_C_O2(i,end)+C_C_CO2(i,end)+C_C_CO(i,end)+C_C_H2O(i,end)+C_C_N2(i,end)))*Components(6).Mw + (C_C_N2(i,end)/(C_C_C2H6(i,end)+C_C_C2H4(i,end)+C_C_O2(i,end)+C_C_CO2(i,end)+C_C_CO(i,end)+C_C_H2O(i,end)+C_C_N2(i,end)))*Components(7).Mw))/(R*T(i,end)); % [g/m^3] Density of fluid;
-C_T(i,end)       = (ker*Ar(end,2:end-1)*T(i,2:end-1) + hw*Tb + ker*Ar(end,1)*(-Ar(1,2:end-1)*T(i,2:end-1) - ker*Ar(1,end)*(Ar(end,2:end-1)*T(i,2:end-1) + hw*Tb)/(hw - ker*Ar(end,end)))/((1 + (ker*Ar(1,end)*Ar(end,1))/(hw - ker*Ar(end,end)))*Ar(1,1)))/(hw - ker*Ar(end,end));
+C_T(i,end)       = (keffr*Ar(end,2:end-1)*C_T(i,2:end-1) + hw*Tb + keffr*Ar(end,1)*(-Ar(1,2:end-1)*C_T(i,2:end-1) - Ar(1,end)*(keffr*Ar(end,2:end-1)*C_T(i,2:end-1) + hw*Tb)/(hw - keffr*Ar(end,end)))/((1 + (keffr*Ar(1,end)*Ar(end,1))/((hw - keffr*Ar(end,end))*Ar(1,1) ) )*Ar(1,1)) )/(hw - keffr*Ar(end,end));
 C_Ts(i,end)      = X(8);
              
 end
