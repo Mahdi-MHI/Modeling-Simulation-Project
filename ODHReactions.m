@@ -27,7 +27,7 @@ Tetha_C2H4 = K(2)*P_solid(2)*Tetha_star;
 k = ones(1,5);
 rxn = k(:);
 for i = 1:5
-    k(i)   = RxnKinetic.Aprime(i)*exp(-RxnKinetic.EnergyA(i)/R*(1/Ts - 1/(25+273.15)));
+    k(i)   = exp(RxnKinetic.Aprime(i) - RxnKinetic.EnergyA(i)/R*(1/Ts - 1/(25+273.15)));
     if i < 4    
         rxn(i) = k(i) * Tetha_O^(RxnKinetic.m(i)) * Tetha_C2H6;
     else
